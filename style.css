@@ -1,0 +1,161 @@
+/* OSINT4ALL board. Colours are tokens; the dark set follows the system setting. */
+:root {
+  color-scheme: light dark;
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #eceef2;
+  --line: #dde1e7;
+  --text: #1a1e24;
+  --muted: #5b6471;
+  --accent: #2b63d9;
+  --visited: #7046b8;
+  --hover: #e8eef9;
+  --mark: #2b63d9;
+  --icon-bg: transparent;
+  --icon-pad: 0;
+  --shadow: 0 1px 2px rgba(20, 30, 45, 0.06);
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151a;
+    --surface: #1b1f25;
+    --surface-2: #252a31;
+    --line: #2d333b;
+    --text: #e6e8eb;
+    --muted: #98a1ac;
+    --accent: #86acff;
+    --visited: #b79cf0;
+    --hover: #252d3a;
+    --mark: #86acff;
+    /* many favicons are dark-on-transparent: give them a light tile so they stay visible */
+    --icon-bg: #e9edf2;
+    --icon-pad: 1px;
+    --shadow: none;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Header */
+.top {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mark { color: var(--mark); flex: none; }
+.brand h1 { margin: 0; font-size: 19px; line-height: 1.15; letter-spacing: 0.02em; }
+.meta { margin: 1px 0 0; color: var(--muted); font-size: 12.5px; }
+.controls { display: flex; align-items: center; gap: 10px; flex: 1 1 360px; justify-content: flex-end; min-width: 0; }
+
+.search {
+  position: relative; display: flex; align-items: center;
+  flex: 0 1 340px; min-width: 0;
+}
+.search svg { position: absolute; left: 10px; color: var(--muted); pointer-events: none; }
+.search input {
+  width: 100%; height: 36px; padding: 0 34px 0 34px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font: 14px var(--font);
+}
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button { display: none; }
+.search kbd {
+  position: absolute; right: 8px;
+  min-width: 20px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px;
+  color: var(--muted); font: 11.5px/1.4 var(--font); text-align: center; pointer-events: none;
+}
+.search input:focus + kbd, .search input:not(:placeholder-shown) + kbd { display: none; }
+.count { color: var(--muted); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.btn {
+  height: 36px; padding: 0 12px; flex: none;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); color: var(--text); font: 500 13px var(--font); cursor: pointer;
+}
+.btn:hover { background: var(--hover); }
+
+/* Board: the column count is set by app.js (4 = the original page's columns) */
+.board {
+  --cols: 4;
+  display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 14px;
+  align-items: start;
+  max-width: 1680px; margin: 0 auto; padding: 18px 20px 8px;
+}
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel h2 { margin: 0; }
+.panel-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 12px; border: 0; background: transparent; cursor: pointer;
+  color: var(--text); font: 650 12px/1.3 var(--font); letter-spacing: 0.07em; text-transform: uppercase; text-align: left;
+}
+.panel-head:hover { background: var(--surface-2); }
+.panel-head .name { flex: 1; min-width: 0; }
+.panel-head .num {
+  padding: 1px 7px; border-radius: 10px; background: var(--surface-2);
+  color: var(--muted); font-size: 11px; letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.panel-head .chev { color: var(--muted); transition: transform 0.15s ease; flex: none; }
+.panel.closed .chev { transform: rotate(-90deg); }
+.panel.closed .links { display: none; }
+.board.searching .panel.closed .links { display: block; }
+.board.searching .panel.closed .chev { transform: none; }
+
+.links { list-style: none; margin: 0; padding: 0 6px 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+.links a {
+  display: flex; align-items: center; gap: 9px;
+  padding: 4px 6px; border-radius: 6px;
+  color: var(--text); text-decoration: none; font-size: 13.5px;
+}
+.links a:hover { background: var(--hover); color: var(--accent); }
+.links a:visited .t { color: var(--visited); }
+.links .t { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.links img, .links .globe { width: 16px; height: 16px; flex: none; border-radius: 3px; }
+.links img { background: var(--icon-bg); padding: var(--icon-pad); }
+.links .globe { color: var(--muted); }
+
+.empty { max-width: 1680px; margin: 24px auto; padding: 0 20px; color: var(--muted); text-align: center; }
+
+.foot {
+  max-width: 1680px; margin: 0 auto; padding: 18px 20px 32px;
+  color: var(--muted); font-size: 12.5px; text-align: center;
+}
+.foot p { margin: 0 auto; max-width: 760px; }
+
+/* Phones: one column, full-width search, 16px gutters */
+@media (max-width: 640px) {
+  .top { padding: 10px 16px; }
+  .controls { flex-basis: 100%; }
+  .search { flex: 1 1 auto; }
+  .count { display: none; }
+  .board { padding: 14px 16px 6px; gap: 12px; }
+  .col { gap: 12px; }
+  .foot { padding: 14px 16px 28px; }
+  .links a { padding: 7px 6px; font-size: 14.5px; }
+}

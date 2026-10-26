@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Sites opened from this board never learn where the visit came from. -->
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Offline copy of the OSINT4ALL link board: open-source intelligence tools sorted into panels.">
+<title>OSINT4ALL</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+      <circle cx="13.5" cy="13.5" r="8.5" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <path d="M20 20l7 7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.5" cy="13.5" r="2.6" fill="currentColor"/>
+    </svg>
+    <div>
+      <h1>OSINT4ALL</h1>
+      <p class="meta" id="meta">Open-source intelligence link board</p>
+    </div>
+  </div>
+  <div class="controls">
+    <label class="search">
+      <span class="sr-only">Search links</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.6-3.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Search links" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">/</kbd>
+    </label>
+    <span class="count" id="count" aria-live="polite"></span>
+    <button id="toggle-all" class="btn" type="button">Collapse all</button>
+  </div>
+</header>
+
+<main>
+  <div id="board" class="board"></div>
+  <p id="empty" class="empty" hidden></p>
+  <noscript><p class="empty">This board needs JavaScript turned on to show its links.</p></noscript>
+</main>
+
+<footer class="foot">
+  <p>Links curated by OSINT4ALL on <a id="source" href="https://start.me/p/L1rEYQ/osint4all" target="_blank" rel="noopener noreferrer">start.me</a>.
+  This is an independent copy taken <span id="snapshot">from that page</span>, not affiliated with start.me or OSINT4ALL.
+  Every link opens in a new tab and sends no referrer.</p>
+</footer>
+
+<script src="data/board.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
