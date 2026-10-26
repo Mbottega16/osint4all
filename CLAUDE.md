@@ -12,11 +12,11 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **Platform / stack:** plain HTML, CSS and JS. Node (no packages) only for the import script and the tests.
 - **Money:** none. No hosting, no services.
 - **What "done" looks like:** a double-click opens the board on either computer, and it matches the original's links.
-- **Direction:** refresh from a new snapshot when the original changes. Going public (GitHub Pages) is the owner's call.
+- **Direction:** refresh from a new snapshot when the original changes.
 
 ## Settled decisions (don't re-argue)
-- **Private repo (2026-10-26).** Making it public or turning on Pages is a new public deployment, so it needs the owner's yes (vault rules.md rule 3).
-- **The data is copied, the page is not.** Link names, addresses, panel names and order follow the original. The design and code are this repo's own, and the footer credits OSINT4ALL. Don't copy start.me's markup, styles or branding.
+- **Public and live on GitHub Pages (owner, 2026-10-26)** at https://mbottega16.github.io/osint4all/, served from `main` at the repo root. A push to `main` publishes it.
+- **The data is copied, the page is not.** Link names, addresses, panel names and order follow the original. The design and code are this repo's own. The header says "Unofficial copy" and the footer credits OSINT4ALL and disclaims any affiliation. Keep both now that it's public, and don't copy start.me's markup, styles or branding.
 - **No network calls of its own.** Favicons are files in `icons/`, the page sends no referrer, and links open with `noopener noreferrer`. The tests enforce this. An OSINT board shouldn't tell 270 sites that you opened it.
 - **No build step.** `data/board.js` is a script the page loads, so `index.html` works straight from disk (`file://`) on both computers.
 - **The original's 4 columns are kept at 1200 px and wider.** Narrower screens reflow to 3, 2 or 1 columns in reading order.
@@ -33,7 +33,8 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - `Open OSINT4ALL.command` (Mac) / `Open OSINT4ALL.bat` (PC) — open the board in the default browser.
 
 ## Commands & Verification
-- **Where it lives:** Mac `~/Desktop/my-brain/projects/osint4all/app` · PC `~/OneDrive/Desktop/OSINT4ALL` · GitHub `Mbottega16/osint4all` (private)
+- **Where it lives:** Mac `~/Desktop/my-brain/projects/osint4all/app` · PC `~/OneDrive/Desktop/OSINT4ALL` · GitHub `Mbottega16/osint4all` (public) · live at https://mbottega16.github.io/osint4all/
+- **Deploy check:** `gh api repos/Mbottega16/osint4all/pages/builds/latest -q .status` should say `built` a minute or so after a push.
 - **Open:** double-click the launcher for the computer you're on, or open `index.html`.
 - **Test (same on both):** `node --test test/`. Passing prints `fail 0` (6 tests).
 - **After any visual change:** load the page from disk in Playwright at 1440, 1000 and 390 px wide, in light and dark, and look at the screenshots. Check for no console errors and no non-`file:` requests. Mac Playwright: `~/.mosaic-crew/node_modules` or the vault's `projects/elo-bot-ascent/app/node_modules`.
@@ -49,11 +50,11 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **SOCMINT and GEOINT** link to sibling start.me boards. They are kept as on the original.
 - **Panel names are the keys for remembered collapsed panels.** Renaming a panel forgets its state, and the test requires unique names.
 - **Line endings:** the `.bat` must keep CRLF and the `.command` must stay executable. `.gitattributes` and the test cover both.
+- **`.nojekyll`** stops GitHub Pages from running Jekyll over the files. Keep it.
 
 ## Session Handoff (Last Worked On · Current State · Next Up)
-- **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. Pushed to private `Mbottega16/osint4all`.
+- **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. Made it public and live on GitHub Pages at the owner's request.
 - **Current State:** 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
 - **Next Up:**
   1. PC: `git clone https://github.com/Mbottega16/osint4all.git` into `~/OneDrive/Desktop/OSINT4ALL`, then double-click the `.bat`.
-  2. Owner decides whether to make it public and turn on GitHub Pages.
-  3. Refresh when the original board changes.
+  2. Refresh when the original board changes.

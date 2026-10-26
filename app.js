@@ -194,7 +194,7 @@
   const when = /^\d{4}-\d{2}-\d{2}$/.test(B.snapshot || "")
     ? new Date(B.snapshot + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
     : "";
-  $("meta").textContent = total + " links in " + panels.length + " panels" + (when ? " · snapshot " + when : "");
+  $("meta").textContent = "Unofficial copy · " + total + " links in " + panels.length + " panels" + (when ? " · snapshot " + when : "");
   if (when) $("snapshot").textContent = "on " + when;
   if (B.source) $("source").href = B.source;
   q.placeholder = "Search " + total + " links";
