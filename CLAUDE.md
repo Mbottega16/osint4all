@@ -37,7 +37,9 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **Where it lives:** Mac `~/Desktop/my-brain/projects/osint4all/app` · PC `~/OneDrive/Desktop/OSINT4ALL` · GitHub `Mbottega16/osint4all` (public) · live at https://mbottega16.github.io/osint4all/
 - **Deploy check:** `gh api repos/Mbottega16/osint4all/pages/builds/latest -q .status` should say `built` a minute or so after a push.
 - **Open:** double-click the launcher for the computer you're on, or open `index.html`.
-- **Test (same on both):** `node --test test/`. Passing prints `fail 0` (6 tests).
+- **Test, Mac:** `node --test test/`. Passing prints `fail 0` (6 tests).
+- **Test, PC:** `node --test test/board.test.mjs`. Node 22 on Windows fails on the bare `test/` folder. The launcher test also fails there (1 of 6): Windows does not report the executable flag. That is not a defect.
+- **PC Playwright:** `~/OneDrive/Desktop/EloBotAscent/node_modules/playwright`. Run it headless; do not open windows in front of the owner.
 - **After any visual change:** load the page from disk in Playwright at 1440, 1000 and 390 px wide, in light and dark, and look at the screenshots. Check for no console errors and no non-`file:` requests. Mac Playwright: `~/.mosaic-crew/node_modules` or the vault's `projects/elo-bot-ascent/app/node_modules`.
 - **Refresh from a new snapshot:** `node scripts/import-scrape.mjs <data.json> <icons.json> YYYY-MM-DD`, then update `ORIGINAL` in the test to the new panel counts, on purpose.
 
@@ -55,8 +57,8 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 
 ## Session Handoff (Last Worked On · Current State · Next Up)
 - **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. The owner said to make it public; the page is ready for it.
-- **Current State:** **public** since 2026-10-26 (the owner flipped it). **Pages isn't on yet**: the owner runs `gh api -X POST repos/Mbottega16/osint4all/pages -f "source[branch]=main" -f "source[path]=/"`, because auto mode won't create a public site. **The board is incomplete.** The 10-26 scrape never scrolled, so it missed panels start.me draws only when you scroll to them. `scripts/export-from-browser.js`, run in the owner's own Chrome, collects the whole board; it was tested on a fake lazy-drawing page (694/694 links, 2 sections). 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
+- **Current State:** **public** since 2026-10-26 (the owner flipped it). **Pages is on and built** at https://mbottega16.github.io/osint4all/. The PC clone is at `~/OneDrive/Desktop/OSINT4ALL`; a headless Chromium check there passed (0 console errors, 0 non-file requests, search works). **The board is incomplete.** The 10-26 scrape never scrolled, so it missed panels start.me draws only when you scroll to them. `scripts/export-from-browser.js`, run in the owner's own Chrome, collects the whole board; it was tested on a fake lazy-drawing page (694/694 links, 2 sections). 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
 - **Next Up:**
   1. The owner runs the export in Chrome. Import the downloaded `osint4all-export.json`: teach `import-scrape.mjs` the export format, plus sections if the page has more than one. Update the test's `ORIGINAL`, every "387" in the docs, and the vault `context.md`, then verify, push, and check the live site.
-  2. PC: `git clone https://github.com/Mbottega16/osint4all.git` into `~/OneDrive/Desktop/OSINT4ALL`, then double-click the `.bat`.
+  2. Check the Windows `.bat` with a real double-click (the PC clone exists since 2026-10-26).
   3. Refresh when the original board changes.
