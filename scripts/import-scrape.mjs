@@ -1,32 +1,78 @@
-// Turn a browser scrape of the OSINT4ALL start.me page into this repo's data:
+// Turn an export of the OSINT4ALL start.me page into this repo's data:
 // data/board.js (every panel and link, in the original column order) and icons/
 // (one favicon file per site, so the page makes no network calls of its own).
 //
-// Usage: node scripts/import-scrape.mjs <scrape data.json> <scrape icons.json> <snapshot YYYY-MM-DD>
+// Usage:
+//   node scripts/import-scrape.mjs <osint4all-export.json> <YYYY-MM-DD>
+//       the file scripts/export-from-browser.js downloads (links and icons in one file)
+//   node scripts/import-scrape.mjs <data.json> <icons.json> <YYYY-MM-DD>
+//       the older two-file format of the vault's projects/atlas/osint-board/source/extract.cjs
 //
-// The scrape format is what the vault's projects/atlas/osint-board/source/extract.cjs writes:
-// data.json = { columns: [[{ title, items: [{ title, href, icon }] }]] },
-// icons.json = { "<icon url>": { type, b64 } | { error } }.
+// A link panel that comes back empty stops the import (it was collapsed or never drew), so a
+// half-read board is never written. A live Reddit feed panel becomes links to its subreddits;
+// clocks and other panels without links are left out.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const [dataFile, iconsFile, snapshot] = process.argv.slice(2);
-if (!dataFile || !iconsFile || !/^\d{4}-\d{2}-\d{2}$/.test(snapshot || "")) {
-  console.error("Usage: node scripts/import-scrape.mjs <data.json> <icons.json> <YYYY-MM-DD>");
+const args = process.argv.slice(2);
+const snapshot = args.pop();
+if (!/^\d{4}-\d{2}-\d{2}$/.test(snapshot || "") || (args.length !== 1 && args.length !== 2)) {
+  console.error("Usage: node scripts/import-scrape.mjs <osint4all-export.json> <YYYY-MM-DD>\n   or: node scripts/import-scrape.mjs <data.json> <icons.json> <YYYY-MM-DD>");
   process.exit(1);
 }
-const scrape = JSON.parse(fs.readFileSync(dataFile, "utf8"));
-const icons = JSON.parse(fs.readFileSync(iconsFile, "utf8"));
+const readJson = (f) => JSON.parse(fs.readFileSync(f, "utf8"));
 const EXT = { "image/webp": "webp", "image/png": "png", "image/x-icon": "ico", "image/vnd.microsoft.icon": "ico", "image/svg+xml": "svg", "image/jpeg": "jpg", "image/gif": "gif" };
+
+// Both formats become: columns of { title, type, items: [{ title, href, icon }], links: [{ title, href }] }
+let scraped, icons;
+if (args.length === 1) {
+  const exp = readJson(args[0]);
+  if (!/^osint4all-export\//.test(exp.format || "")) throw new Error(args[0] + " is not an osint4all export");
+  if (exp.sections.length !== 1) throw new Error(`the page has ${exp.sections.length} sections; app.js draws one`);
+  scraped = exp.sections[0].columns;
+  icons = exp.icons || {};
+} else {
+  scraped = readJson(args[0]).columns.map((col) => col.map((p) => ({ ...p, type: "bookmark-widget", links: [] })));
+  icons = readJson(args[1]);
+}
+
+// A feed panel lists today's posts; the copy links the feeds' sources instead.
+function feedSources(links) {
+  const seen = new Map();
+  for (const l of links) {
+    const u = new URL(l.href);
+    const sub = u.hostname.endsWith("reddit.com") && u.pathname.match(/^\/r\/([^/]+)/);
+    const url = sub ? `https://www.reddit.com/r/${sub[1]}/` : u.origin + "/";
+    if (!seen.has(url)) seen.set(url, { title: sub ? "r/" + sub[1] : u.hostname, href: url, icon: "" });
+  }
+  return [...seen.values()];
+}
+
+const skipped = [], empty = [];
+const panels = scraped.map((col) =>
+  col.flatMap((p) => {
+    const title = p.title.trim();
+    if (/bookmark/.test(p.type)) {
+      if (!p.items.length) empty.push(title);
+      return [{ title, items: p.items }];
+    }
+    if (/rss/.test(p.type) && p.links.length) return [{ title, items: feedSources(p.links) }];
+    skipped.push(`${title || "(no title)"} (${p.type || "unknown"})`);
+    return [];
+  })
+);
+if (empty.length) {
+  console.error(`Stopped: ${empty.length} link panels came back empty, so this board is incomplete:\n  ${empty.join("\n  ")}`);
+  process.exit(1);
+}
 
 // icons/ is generated: start empty so a site dropped from the board leaves no orphan file
 const iconDir = path.join(ROOT, "icons");
 fs.rmSync(iconDir, { recursive: true, force: true });
 fs.mkdirSync(iconDir);
-
 const saved = new Map(); // icon url -> file name (or null when there is none)
 function iconFile(url) {
   if (saved.has(url)) return saved.get(url);
@@ -41,11 +87,8 @@ function iconFile(url) {
   return name;
 }
 
-const columns = scrape.columns.map((col) =>
-  col.map((panel) => ({
-    title: panel.title.trim(),
-    links: panel.items.map((it) => ({ title: it.title.trim(), url: it.href, icon: iconFile(it.icon) })),
-  }))
+const columns = panels.map((col) =>
+  col.map((p) => ({ title: p.title, links: p.items.map((it) => ({ title: it.title.trim(), url: it.href, icon: iconFile(it.icon) })) }))
 );
 
 // One link per line keeps diffs readable when a link is added, moved or fixed.
@@ -73,6 +116,7 @@ const out = [
 ].join("\n");
 fs.writeFileSync(path.join(ROOT, "data", "board.js"), out);
 
-const links = columns.flat().reduce((n, p) => n + p.links.length, 0);
+const all = columns.flat().flatMap((p) => p.links);
 const files = new Set([...saved.values()].filter(Boolean));
-console.log(`columns ${columns.length} · panels ${columns.flat().length} · links ${links} · icon files ${files.size} · links without an icon ${columns.flat().flatMap((p) => p.links).filter((l) => !l.icon).length}`);
+console.log(`columns ${columns.length} (${columns.map((c) => c.length).join(" + ")} panels) · panels ${columns.flat().length} · links ${all.length} · icon files ${files.size} · links without an icon ${all.filter((l) => !l.icon).length}`);
+if (skipped.length) console.log("left out (no links): " + skipped.join(", "));

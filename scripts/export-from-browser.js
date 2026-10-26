@@ -1,7 +1,7 @@
 // Export the whole OSINT4ALL board from your own browser.
 // 1. Open https://start.me/p/L1rEYQ/osint4all in Chrome.  2. Press Cmd+Option+J (Mac) or Ctrl+Shift+J (PC).
 // 3. Paste this whole file into the console and press Enter (Chrome may first ask you to type: allow pasting).
-// It scrolls the board so every section draws, reads every panel and link, and downloads
+// It brings every panel into view in turn, waits for its links to draw, reads them, and downloads
 // osint4all-export.json. Then: node scripts/import-scrape.mjs <that file> <YYYY-MM-DD>
 (async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -10,63 +10,69 @@
   const text = (e) => (e ? e.textContent.replace(/\s+/g, " ").trim() : "");
   const warnings = [];
 
-  // start.me scrolls an inner panel rather than the window: use the tallest scrollable element.
-  const scroller = [document.scrollingElement, ...document.querySelectorAll("*")]
-    .filter((e) => e && e.scrollHeight > e.clientHeight + 50 && (e === document.scrollingElement || /(auto|scroll)/.test(getComputedStyle(e).overflowY)))
-    .sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || document.scrollingElement;
-
-  // Panels can be drawn only near the screen (and dropped again further away), so every panel is
-  // recorded as soon as it appears, keyed by its place on the page, keeping its fullest reading.
-  const found = new Map();
-  const sectionTitles = [];
-  function collect() {
-    document.querySelectorAll(".page-section").forEach((sec, si) => {
-      const head = sec.querySelector("[class*='section__title'], [class*='section-title'], [class*='section__header'], [class*='section-header']");
-      if (head && !head.closest(".page-section__widget") && text(head)) sectionTitles[si] = text(head);
-      sec.querySelectorAll(".page-section__column").forEach((col, ci) => {
-        col.querySelectorAll(".page-section__widget").forEach((slot, wi) => {
-          for (const b of slot.querySelectorAll("button")) if (/^(show|view|see|load) (all|more)/i.test(text(b))) b.click();
-          const items = [...slot.querySelectorAll(".bookmark-widget__item-wrapper")].map((li) => {
-            const a = li.querySelector("a[href]");
-            const img = li.querySelector("img");
-            return { title: text(li.querySelector(".bookmark-item__title")) || (a && a.getAttribute("title")) || text(a), href: a ? a.href : "", icon: img ? img.src : "" };
-          });
-          const links = items.length ? [] : [...slot.querySelectorAll("a[href]")].map((a) => ({ title: text(a) || a.getAttribute("title") || "", href: a.href }));
-          const panel = {
-            si, ci, wi,
-            title: text(slot.querySelector(".widget-header__text")),
-            type: [...new Set([...slot.querySelectorAll("[class*='-widget']")].flatMap((e) => cls(e).split(/\s+/)).filter((c) => /-widget$/.test(c)))].join(" "),
-            items, links,
-            text: items.length || links.length ? "" : slot.innerText.trim().slice(0, 400),
-          };
-          const size = (p) => p.items.length * 2 + p.links.length * 2 + (p.title ? 1 : 0) + (p.text ? 1 : 0);
-          const key = si + "/" + ci + "/" + wi;
-          if (!found.has(key) || size(panel) > size(found.get(key))) found.set(key, panel);
-        });
-      });
+  // start.me draws a panel's links only while the panel is near the screen. Scrolling "the page" is
+  // unreliable (it scrolls an inner area), so each panel is scrolled into view by itself instead.
+  const sections = () => [...document.querySelectorAll(".page-section")];
+  const slots = () => [...document.querySelectorAll(".page-section__widget")];
+  function where(slot) {
+    const sec = slot.closest(".page-section"), col = slot.closest(".page-section__column");
+    return {
+      si: sections().indexOf(sec),
+      ci: sec ? [...sec.querySelectorAll(".page-section__column")].indexOf(col) : 0,
+      wi: col ? [...col.querySelectorAll(".page-section__widget")].indexOf(slot) : 0,
+    };
+  }
+  function read(slot) {
+    for (const b of slot.querySelectorAll("button")) if (/^(show|view|see|load) (all|more)/i.test(text(b))) b.click();
+    const items = [...slot.querySelectorAll(".bookmark-widget__item-wrapper")].map((li) => {
+      const a = li.querySelector("a[href]");
+      const img = li.querySelector("img");
+      return { title: text(li.querySelector(".bookmark-item__title")) || (a && a.getAttribute("title")) || text(a), href: a ? a.href : "", icon: img ? img.src : "" };
     });
+    const links = items.length ? [] : [...slot.querySelectorAll("a[href]")].map((a) => ({ title: text(a) || a.getAttribute("title") || "", href: a.href }));
+    const type = [...new Set([...slot.querySelectorAll("[class*='-widget']")].flatMap((e) => cls(e).split(/\s+/)).filter((c) => /-widget$/.test(c)))].join(" ");
+    return {
+      title: text(slot.querySelector(".widget-header__text")), type, items, links,
+      text: items.length || links.length ? "" : slot.innerText.trim().slice(0, 400),
+    };
+  }
+  const size = (p) => p.items.length + p.links.length;
+  // Read one panel: bring it into view, then wait until its links have drawn and stopped changing.
+  async function visit(i, patience) {
+    const slot = slots()[i];
+    if (!slot) return null;
+    slot.scrollIntoView({ block: "center", inline: "nearest" });
+    let best = read(slot), same = 0;
+    for (let t = 0; t * 150 < patience && same < 2; t++) {
+      await wait(150);
+      const now = read(slots()[i] || slot);
+      same = size(now) > 0 && size(now) === size(best) ? same + 1 : 0;
+      if (size(now) >= size(best)) best = now;
+      if (best.type && !/bookmark|rss/.test(best.type) && t >= 2) break; // clocks and notes have no links to wait for
+    }
+    return { ...where(slots()[i] || slot), ...best };
   }
 
-  log("scrolling the board so every section draws…");
-  scroller.scrollTop = 0;
-  await wait(1200);
-  collect();
-  let lastHeight = -1, still = 0;
-  for (let step = 0; step < 600 && still < 4; step++) {
-    scroller.scrollTop += Math.max(200, Math.round(scroller.clientHeight * 0.6));
-    await wait(350);
-    collect();
-    const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
-    still = atEnd && scroller.scrollHeight === lastHeight ? still + 1 : 0;
-    lastHeight = scroller.scrollHeight;
-    if (step % 8 === 0) log(found.size + " panels so far…");
+  const total = slots().length;
+  log(`reading ${total} panels one by one (about a minute)…`);
+  const found = [];
+  for (let i = 0; i < total; i++) {
+    found[i] = await visit(i, 4000);
+    if (i % 10 === 9 || i === total - 1) log(`${i + 1}/${total} panels read, ${found.reduce((n, p) => n + (p ? size(p) : 0), 0)} links so far`);
   }
-  if (scroller.scrollWidth > scroller.clientWidth + 50) warnings.push("the board is wider than the window; widen the window and run this again");
-  scroller.scrollTop = 0;
+  // A second, more patient look at any panel that came back empty (unless it's a clock or a note).
+  for (let i = 0; i < total; i++) {
+    const p = found[i];
+    if (p && !size(p) && !(p.type && !/bookmark|rss/.test(p.type))) {
+      const again = await visit(i, 8000);
+      if (again && size(again)) found[i] = again;
+    }
+  }
+  if (slots()[0]) slots()[0].scrollIntoView({ block: "start" });
 
-  const panels = [...found.values()].sort((a, b) => a.si - b.si || a.ci - b.ci || a.wi - b.wi);
+  const panels = found.filter(Boolean).sort((a, b) => a.si - b.si || a.ci - b.ci || a.wi - b.wi);
   for (const p of panels) {
-    if (p.items.length || p.links.length) continue;
+    if (size(p)) continue;
     if (/bookmark/.test(p.type)) warnings.push(`panel "${p.title || "(no title)"}" has no links; it may be collapsed on the page (open it and run this again)`);
     else warnings.push(`panel "${p.title || "(no title)"}" is a ${p.type || "non-link"} panel; its text was kept`);
   }
@@ -89,25 +95,26 @@
     }));
   }
 
-  const sections = [];
+  const out = [];
   for (const p of panels) {
-    const s = (sections[p.si] = sections[p.si] || { title: sectionTitles[p.si] || "", columns: [] });
+    const s = (out[p.si] = out[p.si] || { title: "", columns: [] });
     (s.columns[p.ci] = s.columns[p.ci] || []).push({ title: p.title, type: p.type, items: p.items, links: p.links, text: p.text });
   }
-  const clean = [...sections].map((s) => s && { ...s, columns: [...s.columns].map((c) => c || []) }).filter(Boolean);
-  const out = {
-    format: "osint4all-export/1", source: location.href.split(/[?#]/)[0], title: document.title,
+  const clean = [...out].map((s) => s && { ...s, columns: [...s.columns].map((c) => c || []) }).filter(Boolean);
+  const file = {
+    format: "osint4all-export/2", source: location.href.split(/[?#]/)[0], title: document.title,
     exportedAt: new Date().toISOString(), window: { width: innerWidth, height: innerHeight },
     sections: clean, icons, warnings,
   };
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: "application/json" }));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
   a.download = "osint4all-export.json";
   document.body.append(a);
   a.click();
   a.remove();
-  const nLinks = panels.reduce((n, p) => n + p.items.length + p.links.length, 0);
+  const nLinks = panels.reduce((n, p) => n + size(p), 0);
+  const empty = panels.filter((p) => /bookmark/.test(p.type) && !size(p)).length;
   const nIcons = Object.values(icons).filter((x) => x.b64).length;
-  log(`done: ${clean.length} section(s), ${panels.length} panels, ${nLinks} links, ${nIcons}/${iconUrls.length} icons. Saved osint4all-export.json to Downloads.`);
+  log(`done: ${panels.length} panels, ${nLinks} links, ${nIcons}/${iconUrls.length} icons` + (empty ? `, ${empty} link panels still empty` : ", every link panel read") + ". Saved osint4all-export.json to Downloads.");
   if (warnings.length) console.warn("OSINT4ALL export notes:\n- " + warnings.join("\n- "));
 })();
