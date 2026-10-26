@@ -1,7 +1,7 @@
 # OSINT4ALL board
 
 An offline copy of the [OSINT4ALL](https://start.me/p/L1rEYQ/osint4all) link board on start.me:
-387 open-source intelligence tools in 14 panels, in the same columns and order as the original.
+1,459 open-source intelligence links in 78 panels, in the same columns and order as the original.
 
 **Live:** https://mbottega16.github.io/osint4all/
 

@@ -17,6 +17,14 @@ at the top, then overwrite the handoff. One entry per session, 5–10 lines:
 
 ---
 
+## 2026-10-26 — the whole board: 1,459 links in 78 panels
+*Mac · Claude · export from the owner's Chrome*
+- **Changed:** `data/board.js` and `icons/` now hold the whole start.me board, 78 panels and 1,459 links (was 14 panels and 387 links: the first scrape never scrolled). `export-from-browser.js` fixed: SVG toggles have no `.click()`, so a click event is sent; the toggle list also tries chevron classes and `svg`; ASCII only.
+- **Why:** the owner found sites missing from the copy. start.me blocks scripted access, so the owner ran the export in Chrome.
+- **Verified:** every bookmark panel matches the export (order, names, counts, addresses). 6/6 tests; dropping a link fails two. Chromium at 1440/1000/390 px, light and dark: 1,459 links, 0 broken icons, 0 errors, 0 network requests; search works; screenshots looked at.
+- **Before this (PC session, same day):** PC clone made, Pages turned on and built, PC test command and Playwright path recorded.
+- **Left open:** push (owner's go: it updates the public site); Windows `.bat` double-click; Firefox and Safari.
+
 ## 2026-10-26 — repo created
 *Mac · Claude · first commit*
 - **Changed:** new repo. A static board with all 387 OSINT4ALL links in the original 14 panels and 4 columns, search, collapsible panels, light and dark, local favicons, no referrer, and Mac/PC launchers.

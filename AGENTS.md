@@ -1,6 +1,6 @@
 # OSINT4ALL — rules & map (read this first)
 
-An offline, self-contained copy of the OSINT4ALL link board on start.me: 387 OSINT tools in 14 panels, as one static page with no dependencies.
+An offline, self-contained copy of the OSINT4ALL link board on start.me: 1,459 OSINT links in 78 panels, as one static page with no dependencies.
 
 **History:** `HISTORY.md`, newest first — read it when a task touches
 past work or the reason behind a decision. **Business side** (who it's for, money,
@@ -41,14 +41,14 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **Test, PC:** `node --test test/board.test.mjs`. Node 22 on Windows fails on the bare `test/` folder. The launcher test also fails there (1 of 6): Windows does not report the executable flag. That is not a defect.
 - **PC Playwright:** `~/OneDrive/Desktop/EloBotAscent/node_modules/playwright`. Run it headless; do not open windows in front of the owner.
 - **After any visual change:** load the page from disk in Playwright at 1440, 1000 and 390 px wide, in light and dark, and look at the screenshots. Check for no console errors and no non-`file:` requests. Mac Playwright: `~/.mosaic-crew/node_modules` or the vault's `projects/elo-bot-ascent/app/node_modules`.
-- **Refresh from a new snapshot:** `node scripts/import-scrape.mjs <data.json> <icons.json> YYYY-MM-DD`, then update `ORIGINAL` in the test to the new panel counts, on purpose.
+- **Refresh from a new snapshot:** the owner pastes `scripts/export-from-browser.js` into Chrome's console on the start.me page; it downloads `osint4all-export.json`. Then `node scripts/import-scrape.mjs <osint4all-export.json> YYYY-MM-DD` (the older `<data.json> <icons.json>` pair still works), and update `ORIGINAL` in the test to the new panel counts, on purpose.
 
 ## Never Read / Noise Zones (Do Not Scan)
-- `icons/` — 270 binary favicons.
-- `data/board.js` is about 44 KB: grep it for a link instead of reading it whole.
+- `icons/` — about 1,050 binary favicons (5 MB).
+- `data/board.js` is about 165 KB: grep it for a link instead of reading it whole.
 
 ## Rules & Gotchas
-- **start.me blocks scripted access.** Plain fetches get a 403, and a default headless browser never renders the board. Don't try to get past its bot check. A refresh needs a scrape from a normal browser session, in the format the vault's `projects/atlas/osint-board/source/extract.cjs` writes (`data.json` + `icons.json`).
+- **start.me blocks scripted access.** Plain fetches get a 403, and a default headless browser never renders the board. Don't try to get past its bot check. A refresh needs the owner's own Chrome: `scripts/export-from-browser.js`, pasted into the console on the start.me page (paste the file's contents, not its path).
 - **hs3x.com appears twice** in THROWAWAY CONTACT under two names. The original lists it twice, so keep both.
 - **SOCMINT and GEOINT** link to sibling start.me boards. They are kept as on the original.
 - **Panel names are the keys for remembered collapsed panels.** Renaming a panel forgets its state, and the test requires unique names.
@@ -56,9 +56,9 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **`.nojekyll`** stops GitHub Pages from running Jekyll over the files. Keep it.
 
 ## Session Handoff (Last Worked On · Current State · Next Up)
-- **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. The owner said to make it public; the page is ready for it.
-- **Current State:** **public** since 2026-10-26 (the owner flipped it). **Pages is on and built** at https://mbottega16.github.io/osint4all/. The PC clone is at `~/OneDrive/Desktop/OSINT4ALL`; a headless Chromium check there passed (0 console errors, 0 non-file requests, search works). **The board is incomplete.** The 10-26 scrape never scrolled, so it missed panels start.me draws only when you scroll to them. `scripts/export-from-browser.js`, run in the owner's own Chrome, collects the whole board; it was tested on a fake lazy-drawing page (694/694 links, 2 sections). 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
+- **Last Worked On (2026-10-26, Mac):** imported the owner's Chrome export of the whole board: 1,459 links in 78 panels (4 columns of 18, 25, 17 and 18), 1,056 icon files. Fixed `export-from-browser.js` (SVG panel toggles have no `.click()`; the toggle list now tries chevron classes and `svg`; ASCII only, so a paste can't garble it). Updated the test's `ORIGINAL` and the docs.
+- **Current State:** every bookmark panel matches the export in order, names, counts and addresses (77 of them). The live Reddit feed panel became links to its 3 subreddits; the World clock is left out. 10 addresses appear twice, as on the original. 6/6 tests pass, and dropping a link fails them. In Chromium from `file://` at 1440, 1000 and 390 px, light and dark: 78 panels, 1,459 links, 0 broken icons, 0 console errors, 0 non-file requests; search works. Public on GitHub Pages; **the live site still shows the old 387-link board until this is pushed** (owner's go).
 - **Next Up:**
-  1. The owner runs the export in Chrome. Import the downloaded `osint4all-export.json`: teach `import-scrape.mjs` the export format, plus sections if the page has more than one. Update the test's `ORIGINAL`, every "387" in the docs, and the vault `context.md`, then verify, push, and check the live site.
-  2. Check the Windows `.bat` with a real double-click (the PC clone exists since 2026-10-26).
-  3. Refresh when the original board changes.
+  1. Owner's go: push, then check `gh api repos/Mbottega16/osint4all/pages/builds/latest -q .status` says `built` and the live page counts 1,459 links.
+  2. Check the Windows `.bat` with a real double-click, and Firefox and Safari.
+  3. Refresh when the original board changes: the owner runs `scripts/export-from-browser.js` in Chrome, then `node scripts/import-scrape.mjs <export.json> YYYY-MM-DD`.

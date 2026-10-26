@@ -1,7 +1,7 @@
 // Export the whole OSINT4ALL board from your own browser.
 // 1. Open https://start.me/p/L1rEYQ/osint4all in Chrome.  2. Press Cmd+Option+J (Mac) or Ctrl+Shift+J (PC).
 // 3. Paste this whole file into the console and press Enter (Chrome may first ask you to type: allow pasting).
-// It brings every panel into view in turn, waits for its links to draw, reads them, and downloads
+// It visits every panel, opens any collapsed one, reads its links, closes it again, and downloads
 // osint4all-export.json. Then: node scripts/import-scrape.mjs <that file> <YYYY-MM-DD>
 (async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -10,10 +10,10 @@
   const text = (e) => (e ? e.textContent.replace(/\s+/g, " ").trim() : "");
   const warnings = [];
 
-  // start.me draws a panel's links only while the panel is near the screen. Scrolling "the page" is
-  // unreliable (it scrolls an inner area), so each panel is scrolled into view by itself instead.
   const sections = () => [...document.querySelectorAll(".page-section")];
+  const columns = () => [...document.querySelectorAll(".page-section__column")];
   const slots = () => [...document.querySelectorAll(".page-section__widget")];
+  const titleOf = (slot) => text(slot.querySelector(".widget-header__text"));
   function where(slot) {
     const sec = slot.closest(".page-section"), col = slot.closest(".page-section__column");
     return {
@@ -31,56 +31,92 @@
     });
     const links = items.length ? [] : [...slot.querySelectorAll("a[href]")].map((a) => ({ title: text(a) || a.getAttribute("title") || "", href: a.href }));
     const type = [...new Set([...slot.querySelectorAll("[class*='-widget']")].flatMap((e) => cls(e).split(/\s+/)).filter((c) => /-widget$/.test(c)))].join(" ");
-    return {
-      title: text(slot.querySelector(".widget-header__text")), type, items, links,
-      text: items.length || links.length ? "" : slot.innerText.trim().slice(0, 400),
-    };
+    return { title: titleOf(slot), type, items, links, text: items.length || links.length ? "" : slot.innerText.trim().slice(0, 400) };
   }
   const size = (p) => p.items.length + p.links.length;
-  // Read one panel: bring it into view, then wait until its links have drawn and stopped changing.
-  async function visit(i, patience) {
-    const slot = slots()[i];
-    if (!slot) return null;
-    slot.scrollIntoView({ block: "center", inline: "nearest" });
-    let best = read(slot), same = 0;
+  const isLinkPanel = (p) => !p.type || /bookmark|rss/.test(p.type); // clocks and notes have no links
+  const current = (slot) => (slot.isConnected ? slot : slots().find((s) => titleOf(s) && titleOf(s) === titleOf(slot)) || slot);
+
+  // Wait until a panel's links have drawn and stopped changing.
+  async function settle(slot, patience) {
+    let best = read(current(slot)), same = 0;
     for (let t = 0; t * 150 < patience && same < 2; t++) {
       await wait(150);
-      const now = read(slots()[i] || slot);
+      const now = read(current(slot));
       same = size(now) > 0 && size(now) === size(best) ? same + 1 : 0;
       if (size(now) >= size(best)) best = now;
-      if (best.type && !/bookmark|rss/.test(best.type) && t >= 2) break; // clocks and notes have no links to wait for
+      if (!isLinkPanel(best) && t >= 2) break;
     }
-    return { ...where(slots()[i] || slot), ...best };
+    return best;
   }
 
-  const total = slots().length;
-  log(`reading ${total} panels one by one (about a minute)…`);
-  const found = [];
-  for (let i = 0; i < total; i++) {
-    found[i] = await visit(i, 4000);
-    if (i % 10 === 9 || i === total - 1) log(`${i + 1}/${total} panels read, ${found.reduce((n, p) => n + (p ? size(p) : 0), 0)} links so far`);
+  // Opening a collapsed panel: try the likely controls in its header, remember the one that works.
+  const TOGGLES = ["[aria-expanded='false']", ".widget-header__chevron", "[class*='chevron']", "[class*='collapse']", "[class*='expand']", "[class*='toggle']", "[class*='chev']", "svg", ".widget-header"];
+  const clickEl = (el) => (typeof el.click === "function" ? el.click() : el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })));
+  const RISKY = /menu|delete|remove|edit|setting|share|copy|more-actions/i;
+  let opener = null;
+  const findControl = (slot, sel) => {
+    const head = slot.querySelector(".widget-header") || slot;
+    const el = sel === ".widget-header" ? head : head.querySelector(sel);
+    return el && !RISKY.test(cls(el) + " " + (el.getAttribute("aria-label") || "") + " " + (el.getAttribute("title") || "")) ? el : null;
+  };
+  async function open(slot) {
+    for (const sel of opener ? [opener, ...TOGGLES.filter((s) => s !== opener)] : TOGGLES) {
+      const el = findControl(current(slot), sel);
+      if (!el) continue;
+      clickEl(el);
+      const got = await settle(slot, 3000);
+      if (size(got)) { opener = sel; return { got, sel }; }
+    }
+    return null;
   }
-  // A second, more patient look at any panel that came back empty (unless it's a clock or a note).
-  for (let i = 0; i < total; i++) {
-    const p = found[i];
-    if (p && !size(p) && !(p.type && !/bookmark|rss/.test(p.type))) {
-      const again = await visit(i, 8000);
-      if (again && size(again)) found[i] = again;
+
+  // Reveal every column first (a narrow window can leave the last one off to the side).
+  const cols = columns();
+  if (cols.length) { cols[cols.length - 1].scrollIntoView({ block: "nearest", inline: "end" }); await wait(800); cols[0].scrollIntoView({ block: "start", inline: "start" }); await wait(600); }
+  const debug = { columnsAtStart: columns().length, panelsAtStart: slots().length, opened: 0 };
+
+  const found = new Map(); // slot element -> panel
+  let pass = 0;
+  while (pass++ < 3) {
+    const todo = slots().filter((s) => !found.has(s));
+    if (!todo.length) break;
+    log(`reading ${todo.length} panels one by one (a minute or two)...`);
+    for (let n = 0; n < todo.length; n++) {
+      const slot = todo[n];
+      slot.scrollIntoView({ block: "center", inline: "nearest" });
+      let p = await settle(slot, 1500);
+      if (isLinkPanel(p) && !size(p)) {
+        const r = await open(slot);
+        if (r) {
+          p = r.got;
+          debug.opened++;
+          const back = findControl(current(slot), r.sel); // close it again, as it was
+          if (back) { clickEl(back); await wait(250); }
+        } else if (!debug.sample) debug.sample = current(slot).outerHTML.slice(0, 2500);
+      }
+      found.set(slot, { ...where(current(slot)), ...p });
+      if (n % 10 === 9 || n === todo.length - 1) log(`${n + 1}/${todo.length} panels read, ${[...found.values()].reduce((s, q) => s + size(q), 0)} links so far`);
     }
   }
+  debug.columnsAtEnd = columns().length;
+  debug.panelsAtEnd = slots().length;
+  debug.opener = opener;
+  const firstFull = [...found.keys()].find((s) => size(found.get(s)));
+  if (firstFull) debug.sampleFull = current(firstFull).outerHTML.slice(0, 1500);
   if (slots()[0]) slots()[0].scrollIntoView({ block: "start" });
 
-  const panels = found.filter(Boolean).sort((a, b) => a.si - b.si || a.ci - b.ci || a.wi - b.wi);
+  const panels = [...found.values()].sort((a, b) => a.si - b.si || a.ci - b.ci || a.wi - b.wi);
   for (const p of panels) {
     if (size(p)) continue;
-    if (/bookmark/.test(p.type)) warnings.push(`panel "${p.title || "(no title)"}" has no links; it may be collapsed on the page (open it and run this again)`);
-    else warnings.push(`panel "${p.title || "(no title)"}" is a ${p.type || "non-link"} panel; its text was kept`);
+    if (isLinkPanel(p)) warnings.push(`panel "${p.title || "(no title)"}" has no links even after trying to open it`);
+    else warnings.push(`panel "${p.title || "(no title)"}" is a ${p.type} panel; its text was kept`);
   }
 
   // Icons, through the browser's own session. If the icon server refuses, the import fills them in.
   const icons = {};
   const iconUrls = [...new Set(panels.flatMap((p) => p.items.map((i) => i.icon)).filter((u) => /^https?:/.test(u)))];
-  log("fetching " + iconUrls.length + " icons…");
+  log("fetching " + iconUrls.length + " icons...");
   for (let i = 0; i < iconUrls.length; i += 8) {
     await Promise.all(iconUrls.slice(i, i + 8).map(async (u) => {
       try {
@@ -102,9 +138,9 @@
   }
   const clean = [...out].map((s) => s && { ...s, columns: [...s.columns].map((c) => c || []) }).filter(Boolean);
   const file = {
-    format: "osint4all-export/2", source: location.href.split(/[?#]/)[0], title: document.title,
+    format: "osint4all-export/3", source: location.href.split(/[?#]/)[0], title: document.title,
     exportedAt: new Date().toISOString(), window: { width: innerWidth, height: innerHeight },
-    sections: clean, icons, warnings,
+    sections: clean, icons, warnings, debug,
   };
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: "application/json" }));
@@ -113,8 +149,8 @@
   a.click();
   a.remove();
   const nLinks = panels.reduce((n, p) => n + size(p), 0);
-  const empty = panels.filter((p) => /bookmark/.test(p.type) && !size(p)).length;
+  const empty = panels.filter((p) => isLinkPanel(p) && !size(p)).length;
   const nIcons = Object.values(icons).filter((x) => x.b64).length;
-  log(`done: ${panels.length} panels, ${nLinks} links, ${nIcons}/${iconUrls.length} icons` + (empty ? `, ${empty} link panels still empty` : ", every link panel read") + ". Saved osint4all-export.json to Downloads.");
+  log(`done: ${panels.length} panels in ${debug.columnsAtEnd} columns, ${nLinks} links (opened ${debug.opened} collapsed panels), ${nIcons}/${iconUrls.length} icons` + (empty ? `, ${empty} link panels still empty` : ", every link panel read") + ". Saved osint4all-export.json to Downloads.");
   if (warnings.length) console.warn("OSINT4ALL export notes:\n- " + warnings.join("\n- "));
 })();
