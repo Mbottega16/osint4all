@@ -15,7 +15,7 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **Direction:** refresh from a new snapshot when the original changes.
 
 ## Settled decisions (don't re-argue)
-- **Public and live on GitHub Pages (owner, 2026-10-26)** at https://mbottega16.github.io/osint4all/, served from `main` at the repo root. A push to `main` publishes it.
+- **Public, on GitHub Pages (owner, 2026-10-26)** at https://mbottega16.github.io/osint4all/, served from `main` at the repo root. Once live, a push to `main` publishes it. Auto mode won't flip a repo public, so the owner runs that step.
 - **The data is copied, the page is not.** Link names, addresses, panel names and order follow the original. The design and code are this repo's own. The header says "Unofficial copy" and the footer credits OSINT4ALL and disclaims any affiliation. Keep both now that it's public, and don't copy start.me's markup, styles or branding.
 - **No network calls of its own.** Favicons are files in `icons/`, the page sends no referrer, and links open with `noopener noreferrer`. The tests enforce this. An OSINT board shouldn't tell 270 sites that you opened it.
 - **No build step.** `data/board.js` is a script the page loads, so `index.html` works straight from disk (`file://`) on both computers.
@@ -53,8 +53,9 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 - **`.nojekyll`** stops GitHub Pages from running Jekyll over the files. Keep it.
 
 ## Session Handoff (Last Worked On · Current State · Next Up)
-- **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. Made it public and live on GitHub Pages at the owner's request.
-- **Current State:** 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
+- **Last Worked On (2026-10-26):** built the repo from the 2026-10-26 scrape (387 links, 270 icons). Wrote the page, tests, launchers and docs. The owner said to make it public; the page is ready for it.
+- **Current State:** the repo is **still private, with no Pages site**. Auto mode refused the visibility change, so the owner runs `gh repo edit Mbottega16/osint4all --visibility public --accept-visibility-change-consequences` and `gh api -X POST repos/Mbottega16/osint4all/pages -f "source[branch]=main" -f "source[path]=/"`. 6/6 tests pass, and each data, icon and page check was shown to fail when broken. Screenshots were checked at 1440, 1000 and 390 px in light and dark, with 0 console errors and 0 network requests. Only Chromium was tried; Safari, Firefox and the Windows `.bat` are unchecked.
 - **Next Up:**
-  1. PC: `git clone https://github.com/Mbottega16/osint4all.git` into `~/OneDrive/Desktop/OSINT4ALL`, then double-click the `.bat`.
-  2. Refresh when the original board changes.
+  1. Owner flips it public and turns on Pages (the two commands above). Then check that the live site serves all 387 links, and update the vault's repo table and `context.md` to say public.
+  2. PC: `git clone https://github.com/Mbottega16/osint4all.git` into `~/OneDrive/Desktop/OSINT4ALL`, then double-click the `.bat`.
+  3. Refresh when the original board changes.
