@@ -57,8 +57,7 @@ goals): the my-brain vault, `projects/osint4all/context.md`.
 
 ## Session Handoff (Last Worked On · Current State · Next Up)
 - **Last Worked On (2026-10-26, Mac):** imported the owner's Chrome export of the whole board: 1,459 links in 78 panels (4 columns of 18, 25, 17 and 18), 1,056 icon files. Fixed `export-from-browser.js` (SVG panel toggles have no `.click()`; the toggle list now tries chevron classes and `svg`; ASCII only, so a paste can't garble it). Updated the test's `ORIGINAL` and the docs.
-- **Current State:** every bookmark panel matches the export in order, names, counts and addresses (77 of them). The live Reddit feed panel became links to its 3 subreddits; the World clock is left out. 10 addresses appear twice, as on the original. 6/6 tests pass, and dropping a link fails them. In Chromium from `file://` at 1440, 1000 and 390 px, light and dark: 78 panels, 1,459 links, 0 broken icons, 0 console errors, 0 non-file requests; search works. Public on GitHub Pages; **the live site still shows the old 387-link board until this is pushed** (owner's go).
+- **Current State:** every bookmark panel matches the export in order, names, counts and addresses (77 of them). The live Reddit feed panel became links to its 3 subreddits; the World clock is left out. 10 addresses appear twice, as on the original. 6/6 tests pass, and dropping a link fails them. In Chromium from `file://` at 1440, 1000 and 390 px, light and dark: 78 panels, 1,459 links, 0 broken icons, 0 console errors, 0 non-file requests; search works. Pushed (`f80cc97`) and live on GitHub Pages: the live page shows 78 panels and 1,459 links, with 0 errors and no requests off the site.
 - **Next Up:**
-  1. Owner's go: push, then check `gh api repos/Mbottega16/osint4all/pages/builds/latest -q .status` says `built` and the live page counts 1,459 links.
-  2. Check the Windows `.bat` with a real double-click, and Firefox and Safari.
-  3. Refresh when the original board changes: the owner runs `scripts/export-from-browser.js` in Chrome, then `node scripts/import-scrape.mjs <export.json> YYYY-MM-DD`.
+  1. Check the Windows `.bat` with a real double-click, and Firefox and Safari.
+  2. Refresh when the original board changes: the owner runs `scripts/export-from-browser.js` in Chrome, then `node scripts/import-scrape.mjs <export.json> YYYY-MM-DD`.
