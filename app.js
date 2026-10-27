@@ -1,9 +1,10 @@
-// OSINT4ALL board: draws window.BOARD (data/board.js), then handles search, collapsing and columns.
+// Atlas board: draws window.BOARD (data/board.js), window.ALMANAC (data/almanac.js) and window.GROUPS
+// (data/groups.js), then handles search, collapsing, A-Z order and the column count.
 (function () {
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const board = $("board"), q = $("q"), count = $("count"), empty = $("empty"), toggleAll = $("toggle-all");
+  const board = $("board"), q = $("q"), count = $("count"), empty = $("empty"), toggleAll = $("toggle-all"), azBtn = $("az");
   const B = window.BOARD;
   if (!B || !Array.isArray(B.columns)) {
     empty.textContent = "The link data (data/board.js) didn't load.";
@@ -11,16 +12,18 @@
     return;
   }
 
-  // Which panels the viewer collapsed, kept per browser. Storage can be blocked; the board works without it.
+  // What the viewer chose, kept per browser. Storage can be blocked; the board works without it.
   // Nothing saved yet (a first visit, or storage blocked) means every panel starts closed.
-  const STORE = "osint4all:closed:v2";
-  let closed, firstVisit = true;
+  const STORE = "osint4all:closed:v2", STORE_AZ = "osint4all:az";
+  let closed, firstVisit = true, az = false;
   try {
     const saved = localStorage.getItem(STORE);
     firstVisit = saved === null;
     closed = new Set(JSON.parse(saved || "[]"));
+    az = localStorage.getItem(STORE_AZ) === "1";
   } catch (e) { closed = new Set(); }
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify([...closed])); } catch (e) { /* not kept */ } };
+  const saveAz = () => { try { localStorage.setItem(STORE_AZ, az ? "1" : "0"); } catch (e) { /* not kept */ } };
 
   const SVG = "http://www.w3.org/2000/svg";
   function svg(viewBox, size, paths) {
@@ -51,74 +54,82 @@
     return c;
   };
 
-  // Build every panel once; layout() only moves them between columns.
+  // The panels in data order: the original's, then the owner's Almanac panels (data/almanac.js).
+  const source = B.columns.flat().concat((window.ALMANAC && window.ALMANAC.panels) || []);
+
+  // Which group each panel belongs to (data/groups.js). A panel nobody listed goes to MORE.
+  const groupDefs = ((window.GROUPS || []).map((g) => ({ title: g.title, names: g.panels })));
+  const groupOf = new Map();
+  groupDefs.forEach((g, i) => g.names.forEach((n) => groupOf.set(n, i)));
+  if (source.some((p) => !groupOf.has(p.title))) groupDefs.push({ title: "MORE", names: [] });
+  const groups = groupDefs.map((g) => ({ title: g.title, panels: [] }));
+
+  // Build every panel once; layout() only moves them around.
   const panels = [];
-  // The original's panels keep their columns. The owner's Almanac panels (data/almanac.js) go
-  // after them, each into the shortest column so far.
-  const entries = [];
-  const height = B.columns.map((col) => col.reduce((n, p) => n + p.links.length + 3, 0));
-  B.columns.forEach((col, ci) => col.forEach((p) => entries.push([p, ci])));
-  for (const p of (window.ALMANAC && window.ALMANAC.panels) || []) {
-    const ci = height.indexOf(Math.min(...height));
-    height[ci] += p.links.length + 3;
-    entries.push([p, ci]);
-  }
-  entries.forEach(([p, ci]) => {
-      const n = panels.length;
-      const el = document.createElement("section");
-      el.className = "panel";
-      const h2 = document.createElement("h2");
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "panel-head";
-      btn.setAttribute("aria-controls", "panel-" + n);
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = p.title;
-      const num = document.createElement("span");
-      num.className = "num";
-      num.textContent = p.links.length;
-      btn.append(name, num, chevron());
-      h2.append(btn);
+  const byName = new Map();
+  source.forEach((p) => {
+    const n = panels.length;
+    const el = document.createElement("section");
+    el.className = "panel";
+    const h3 = document.createElement("h3");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "panel-head";
+    btn.setAttribute("aria-controls", "panel-" + n);
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = p.title;
+    const num = document.createElement("span");
+    num.className = "num";
+    num.textContent = p.links.length;
+    btn.append(name, num, chevron());
+    h3.append(btn);
 
-      const ul = document.createElement("ul");
-      ul.className = "links";
-      ul.id = "panel-" + n;
-      const links = p.links.map((l) => {
-        const li = document.createElement("li");
-        const a = document.createElement("a");
-        a.href = l.url;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        a.title = l.url;
-        if (l.icon) {
-          const img = document.createElement("img");
-          img.src = "icons/" + l.icon;
-          img.alt = "";
-          img.width = img.height = 16;
-          img.loading = "lazy";
-          img.addEventListener("error", () => img.replaceWith(globe()), { once: true });
-          a.append(img);
-        } else a.append(globe());
-        const t = document.createElement("span");
-        t.className = "t";
-        t.textContent = l.title;
-        a.append(t);
-        li.append(a);
-        ul.append(li);
-        return { li, hay: (l.title + " " + l.url + " " + p.title).toLowerCase() };
-      });
-      el.append(h2, ul);
+    const ul = document.createElement("ul");
+    ul.className = "links";
+    ul.id = "panel-" + n;
+    const gi = groupOf.has(p.title) ? groupOf.get(p.title) : groups.length - 1;
+    const links = p.links.map((l) => {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = l.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.title = l.url;
+      if (l.icon) {
+        const img = document.createElement("img");
+        img.src = "icons/" + l.icon;
+        img.alt = "";
+        img.width = img.height = 16;
+        img.loading = "lazy";
+        img.addEventListener("error", () => img.replaceWith(globe()), { once: true });
+        a.append(img);
+      } else a.append(globe());
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = l.title;
+      a.append(t);
+      li.append(a);
+      ul.append(li);
+      return { li, hay: (l.title + " " + l.url + " " + p.title + " " + groups[gi].title).toLowerCase() };
+    });
+    el.append(h3, ul);
 
-      const panel = { el, btn, num, title: p.title, col: ci, links, weight: p.links.length + 3 };
-      btn.addEventListener("click", () => {
-        if (board.classList.contains("searching")) return; // every match stays visible while searching
-        setClosed(panel, !closed.has(panel.title));
-        save();
-        syncToggle();
-      });
-      setClosed(panel, firstVisit || closed.has(p.title));
-      panels.push(panel);
+    const panel = { el, btn, num, title: p.title, links, group: gi };
+    btn.addEventListener("click", () => {
+      if (board.classList.contains("searching")) return; // every match stays visible while searching
+      setClosed(panel, !closed.has(panel.title));
+      save();
+      syncToggle();
+    });
+    setClosed(panel, firstVisit || closed.has(p.title));
+    panels.push(panel);
+    groups[gi].panels.push(panel);
+  });
+  // Inside a group, panels follow the order data/groups.js gives; unlisted ones keep data order at the end.
+  groups.forEach((g, gi) => {
+    const rank = (p) => { const i = groupDefs[gi].names.indexOf(p.title); return i < 0 ? 1e6 : i; };
+    g.panels.sort((a, b) => rank(a) - rank(b));
   });
   const total = panels.reduce((n, p) => n + p.links.length, 0);
 
@@ -137,35 +148,57 @@
     syncToggle();
   });
 
-  // Columns: the original page's four on wide screens; narrower screens get fewer,
-  // filled in reading order, each panel going to the shortest column so far.
-  const WIDTHS = [[1200, 4], [880, 3], [600, 2], [0, 1]];
-  let cols = 0;
-  function layout() {
-    const w = window.innerWidth;
-    const n = WIDTHS.find(([min]) => w >= min)[1];
-    if (n === cols) return;
-    cols = n;
-    board.style.setProperty("--cols", n);
-    const boxes = Array.from({ length: n }, () => {
+  // Layout: one section per group (or a single A-Z section), each split into columns that fit the
+  // window. Panels go to the columns in turn, so a group reads left to right, then down. Opening a
+  // panel only lengthens its own column.
+  const MIN_COL = 300, GAP = 12;
+  const sortKey = (t) => t.replace(/^[^A-Za-z0-9]+/, "").toLowerCase();
+  let cols = 0, sections = [];
+  function section(title, list) {
+    const el = document.createElement("section");
+    el.className = "group";
+    const h2 = document.createElement("h2");
+    h2.className = "group-head";
+    const gname = document.createElement("span");
+    gname.textContent = title;
+    const gnum = document.createElement("span");
+    gnum.className = "gnum";
+    h2.append(gname, gnum);
+    const body = document.createElement("div");
+    body.className = "group-panels";
+    const boxes = Array.from({ length: cols }, () => {
       const d = document.createElement("div");
       d.className = "col";
       return d;
     });
-    if (n === B.columns.length) panels.forEach((p) => boxes[p.col].append(p.el));
-    else {
-      const height = new Array(n).fill(0);
-      panels.forEach((p) => {
-        const i = height.indexOf(Math.min(...height));
-        boxes[i].append(p.el);
-        height[i] += p.weight;
-      });
-    }
-    board.replaceChildren(...boxes);
+    list.forEach((p, i) => boxes[i % cols].append(p.el));
+    body.append(...boxes);
+    el.append(h2, body);
+    return { el, gnum, panels: list };
   }
-  window.addEventListener("resize", layout);
+  function layout(force) {
+    const pad = getComputedStyle(board);
+    const room = board.clientWidth - parseFloat(pad.paddingLeft) - parseFloat(pad.paddingRight);
+    const n = Math.max(1, Math.floor((room + GAP) / (MIN_COL + GAP)));
+    if (n === cols && !force) return;
+    cols = n;
+    board.style.setProperty("--cols", n);
+    sections = az
+      ? [section("ALL PANELS, A TO Z", panels.slice().sort((a, b) => sortKey(a.title).localeCompare(sortKey(b.title))))]
+      : groups.filter((g) => g.panels.length).map((g) => section(g.title, g.panels));
+    board.replaceChildren(...sections.map((s) => s.el));
+    filter();
+  }
+  window.addEventListener("resize", () => layout(false));
 
-  // Search: every word must appear in the link's name, its address, or its panel's name.
+  azBtn.addEventListener("click", () => {
+    az = !az;
+    azBtn.setAttribute("aria-pressed", String(az));
+    saveAz();
+    layout(true);
+  });
+
+  // Search: every word must appear in the link's name, its address, its panel's name or its group's name.
   function filter() {
     const raw = q.value.trim();
     const words = raw.toLowerCase().split(/\s+/).filter(Boolean);
@@ -184,7 +217,13 @@
       p.btn.setAttribute("aria-expanded", String(searching || !closed.has(p.title)));
       shown += n;
     }
-    count.textContent = searching ? shown + " of " + total + " links" : total + " links";
+    for (const s of sections) {
+      const open = s.panels.filter((p) => !p.el.hidden);
+      s.el.hidden = open.length === 0;
+      const nLinks = open.reduce((n, p) => n + p.links.filter((l) => !l.li.hidden).length, 0);
+      s.gnum.textContent = open.length + (open.length === 1 ? " panel" : " panels") + " · " + nLinks + (nLinks === 1 ? " link" : " links");
+    }
+    count.textContent = searching ? shown + " of " + total + " links" : "";
     empty.hidden = shown > 0;
     empty.textContent = "No links match “" + raw + "”.";
   }
@@ -204,18 +243,23 @@
     }
   });
 
+  // Snapshot code: a short fingerprint of every panel name and link address, in order. It changes
+  // whenever a link or panel is added, removed or renamed, so two copies with the same code match.
+  function snapshotCode() {
+    let h = 0x811c9dc5;
+    const mix = (s) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } };
+    source.forEach((p) => { mix(p.title); p.links.forEach((l) => mix(l.url)); });
+    return h.toString(16).padStart(8, "0").slice(0, 6).toUpperCase();
+  }
   const when = /^\d{4}-\d{2}-\d{2}$/.test(B.snapshot || "")
     ? new Date(B.snapshot + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
     : "";
-  const extra = (window.ALMANAC && window.ALMANAC.panels) || [];
-  const extraLinks = extra.reduce((n, p) => n + p.links.length, 0);
-  $("meta").textContent = "Unofficial copy · " + (total - extraLinks) + " links in " + (panels.length - extra.length) + " panels" +
-    (when ? " · snapshot " + when : "") + (extra.length ? " · plus " + extraLinks + " Almanac sites" : "");
+  $("meta").textContent = total.toLocaleString("en-US") + " links · " + panels.length + " panels" + (when ? " · snapshot " + when : "") + " · code " + snapshotCode();
   if (when) $("snapshot").textContent = "on " + when;
   if (B.source) $("source").href = B.source;
-  q.placeholder = "Search " + total + " links";
+  q.placeholder = "Search " + total.toLocaleString("en-US") + " links";
+  azBtn.setAttribute("aria-pressed", String(az));
 
-  layout();
-  filter();
+  layout(true);
   syncToggle();
 })();

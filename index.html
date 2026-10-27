@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Sites opened from this board never learn where the visit came from. -->
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Offline copy of the OSINT4ALL link board: open-source intelligence tools sorted into panels.">
-<title>OSINT4ALL</title>
+<meta name="description" content="Atlas link board: research tools and teaching sites, sorted into panels.">
+<title>Atlas</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -19,8 +19,8 @@
       <circle cx="13.5" cy="13.5" r="2.6" fill="currentColor"/>
     </svg>
     <div>
-      <h1>OSINT4ALL</h1>
-      <p class="meta" id="meta">Unofficial copy of the OSINT4ALL link board</p>
+      <h1>Atlas</h1>
+      <p class="meta" id="meta">Link board</p>
     </div>
   </div>
   <div class="controls">
@@ -31,6 +31,7 @@
       <kbd aria-hidden="true">/</kbd>
     </label>
     <span class="count" id="count" aria-live="polite"></span>
+    <button id="az" class="btn" type="button" aria-pressed="false" title="Show every panel in one alphabetical list">A–Z</button>
     <button id="toggle-all" class="btn" type="button">Collapse all</button>
   </div>
 </header>
@@ -42,14 +43,15 @@
 </main>
 
 <footer class="foot">
-  <p>Links curated by OSINT4ALL on <a id="source" href="https://start.me/p/L1rEYQ/osint4all" target="_blank" rel="noopener noreferrer">start.me</a>.
-  This is an independent copy taken <span id="snapshot">from that page</span>, not affiliated with start.me or OSINT4ALL.
-  Panels that start with ALMANAC are the owner's own additions, not part of that board.
+  <p>Most links come from the OSINT4ALL board curated on <a id="source" href="https://start.me/p/L1rEYQ/osint4all" target="_blank" rel="noopener noreferrer">start.me</a>.
+  This is an independent copy taken <span id="snapshot">from that page</span>, regrouped here, and not affiliated with start.me or OSINT4ALL.
+  Panels in TEACHING (ALMANAC) are the owner's own additions, not part of that board.
   Every link opens in a new tab and sends no referrer.</p>
 </footer>
 
 <script src="data/board.js"></script>
 <script src="data/almanac.js"></script>
+<script src="data/groups.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

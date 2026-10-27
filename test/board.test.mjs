@@ -19,6 +19,9 @@ const originalLinks = original.flatMap((p) => p.links.map((l) => ({ ...l, panel:
 const panels = [...original, ...ALMANAC.panels];
 const links = panels.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title })));
 
+const GROUPS = {};
+new Function("window", read("data/groups.js"))(GROUPS);
+
 // The original page as of the snapshot. Update this list only when importing a newer snapshot on purpose:
 // it is here so an edit can't silently drop a panel or a link.
 const ORIGINAL = [
@@ -69,6 +72,22 @@ test("the Almanac panels are the owner's additions and stay apart from the origi
   }
   const hosts = ALMANAC.panels.flatMap((p) => p.links.map((l) => new URL(l.url).hostname));
   assert.equal(new Set(hosts).size, hosts.length, "a site is listed in two Almanac panels");
+});
+
+test("every panel is in exactly one group, and Canada's panels sit together", () => {
+  const listed = GROUPS.GROUPS.flatMap((g) => g.panels);
+  assert.equal(new Set(listed).size, listed.length, "a panel is listed in two groups");
+  assert.deepEqual([...listed].sort(), panels.map((p) => p.title).sort(), "groups.js and the panels disagree");
+  const canada = GROUPS.GROUPS.find((g) => g.title === "CANADA");
+  assert.deepEqual([...canada.panels].sort(), panels.map((p) => p.title).filter((t) => t.startsWith("[CAN]")).sort());
+  assert.equal(GROUPS.GROUPS.at(-1).title, "TEACHING (ALMANAC)");
+});
+
+test("the page is called Atlas, and the A-Z button is there", () => {
+  const html = read("index.html");
+  assert.match(html, /<title>Atlas<\/title>/);
+  assert.match(html, /<h1>Atlas<\/h1>/);
+  assert.match(html, /id="az"/);
 });
 
 test("every link has a name and a real web address", () => {
