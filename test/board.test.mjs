@@ -8,10 +8,15 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f) => fs.readFileSync(path.join(ROOT, f), "utf8");
 
-const PREFIX = "window.BOARD = ";
+let PREFIX = "window.BOARD = ";
 const src = read("data/board.js");
 const BOARD = JSON.parse(src.slice(src.indexOf(PREFIX) + PREFIX.length, src.lastIndexOf(";")));
-const panels = BOARD.columns.flat();
+const ASRC = read("data/almanac.js");
+const ALMANAC = JSON.parse(ASRC.slice(ASRC.indexOf(PREFIX = "window.ALMANAC = ") + PREFIX.length, ASRC.lastIndexOf(";")));
+const original = BOARD.columns.flat();
+const originalLinks = original.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title })));
+// Every panel on the page: the original's, then the owner's Almanac panels.
+const panels = [...original, ...ALMANAC.panels];
 const links = panels.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title })));
 
 // The original page as of the snapshot. Update this list only when importing a newer snapshot on purpose:
@@ -51,9 +56,19 @@ const ORIGINAL = [
 
 test("the board matches the original page: 4 columns, 78 panels, 1459 links, same order", () => {
   assert.deepEqual(BOARD.columns.map((col) => col.map((p) => [p.title, p.links.length])), ORIGINAL);
-  assert.equal(links.length, 1459);
+  assert.equal(originalLinks.length, 1459);
   assert.match(BOARD.snapshot, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(BOARD.source, /^https:\/\/start\.me\/p\//);
+});
+
+test("the Almanac panels are the owner's additions and stay apart from the original", () => {
+  assert.ok(ALMANAC.panels.length > 0);
+  for (const p of ALMANAC.panels) {
+    assert.match(p.title, /^ALMANAC · /, `${p.title} must say it is an Almanac panel`);
+    assert.ok(p.links.length > 0, `${p.title} is empty`);
+  }
+  const hosts = ALMANAC.panels.flatMap((p) => p.links.map((l) => new URL(l.url).hostname));
+  assert.equal(new Set(hosts).size, hosts.length, "a site is listed in two Almanac panels");
 });
 
 test("every link has a name and a real web address", () => {

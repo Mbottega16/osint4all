@@ -12,9 +12,14 @@
   }
 
   // Which panels the viewer collapsed, kept per browser. Storage can be blocked; the board works without it.
-  const STORE = "osint4all:closed";
-  let closed;
-  try { closed = new Set(JSON.parse(localStorage.getItem(STORE) || "[]")); } catch (e) { closed = new Set(); }
+  // Nothing saved yet (a first visit, or storage blocked) means every panel starts closed.
+  const STORE = "osint4all:closed:v2";
+  let closed, firstVisit = true;
+  try {
+    const saved = localStorage.getItem(STORE);
+    firstVisit = saved === null;
+    closed = new Set(JSON.parse(saved || "[]"));
+  } catch (e) { closed = new Set(); }
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify([...closed])); } catch (e) { /* not kept */ } };
 
   const SVG = "http://www.w3.org/2000/svg";
@@ -48,8 +53,17 @@
 
   // Build every panel once; layout() only moves them between columns.
   const panels = [];
-  B.columns.forEach((col, ci) =>
-    col.forEach((p) => {
+  // The original's panels keep their columns. The owner's Almanac panels (data/almanac.js) go
+  // after them, each into the shortest column so far.
+  const entries = [];
+  const height = B.columns.map((col) => col.reduce((n, p) => n + p.links.length + 3, 0));
+  B.columns.forEach((col, ci) => col.forEach((p) => entries.push([p, ci])));
+  for (const p of (window.ALMANAC && window.ALMANAC.panels) || []) {
+    const ci = height.indexOf(Math.min(...height));
+    height[ci] += p.links.length + 3;
+    entries.push([p, ci]);
+  }
+  entries.forEach(([p, ci]) => {
       const n = panels.length;
       const el = document.createElement("section");
       el.className = "panel";
@@ -103,10 +117,9 @@
         save();
         syncToggle();
       });
-      setClosed(panel, closed.has(p.title));
+      setClosed(panel, firstVisit || closed.has(p.title));
       panels.push(panel);
-    })
-  );
+  });
   const total = panels.reduce((n, p) => n + p.links.length, 0);
 
   function setClosed(p, isClosed) {
@@ -194,7 +207,10 @@
   const when = /^\d{4}-\d{2}-\d{2}$/.test(B.snapshot || "")
     ? new Date(B.snapshot + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
     : "";
-  $("meta").textContent = "Unofficial copy · " + total + " links in " + panels.length + " panels" + (when ? " · snapshot " + when : "");
+  const extra = (window.ALMANAC && window.ALMANAC.panels) || [];
+  const extraLinks = extra.reduce((n, p) => n + p.links.length, 0);
+  $("meta").textContent = "Unofficial copy · " + (total - extraLinks) + " links in " + (panels.length - extra.length) + " panels" +
+    (when ? " · snapshot " + when : "") + (extra.length ? " · plus " + extraLinks + " Almanac sites" : "");
   if (when) $("snapshot").textContent = "on " + when;
   if (B.source) $("source").href = B.source;
   q.placeholder = "Search " + total + " links";
