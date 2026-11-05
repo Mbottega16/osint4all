@@ -1,5 +1,11 @@
-# OSINT4ALL — keep AI search out of binary icons and local files
+# OSINT4ALL — keep AI search out of binary icons and big generated data
 .git/
 .DS_Store
 icons/
+icons-extra/
 node_modules/
+data/extra.js
+data/info.js
+data/link-status.json
+data/summaries.json
+data/summaries-rejected.json

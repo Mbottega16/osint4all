@@ -8,19 +8,22 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f) => fs.readFileSync(path.join(ROOT, f), "utf8");
 
-let PREFIX = "window.BOARD = ";
-const src = read("data/board.js");
-const BOARD = JSON.parse(src.slice(src.indexOf(PREFIX) + PREFIX.length, src.lastIndexOf(";")));
-const ASRC = read("data/almanac.js");
-const ALMANAC = JSON.parse(ASRC.slice(ASRC.indexOf(PREFIX = "window.ALMANAC = ") + PREFIX.length, ASRC.lastIndexOf(";")));
-const original = BOARD.columns.flat();
-const originalLinks = original.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title })));
-// Every panel on the page: the original's, then the owner's Almanac panels.
-const panels = [...original, ...ALMANAC.panels];
+function loadData(file, name) {
+  const prefix = "window." + name + " = ";
+  const src = read("data/" + file);
+  return JSON.parse(src.slice(src.indexOf(prefix) + prefix.length, src.lastIndexOf(";")));
+}
+const BOARD = loadData("board.js", "BOARD");
+const EXTRA = loadData("extra.js", "EXTRA");
+const INFO = loadData("info.js", "INFO");
+const STATUS = JSON.parse(read("data/link-status.json")).links;
+const panels = BOARD.columns.flat();
 const links = panels.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title })));
-
-const GROUPS = {};
-new Function("window", read("data/groups.js"))(GROUPS);
+// the extra groups (SOCMINT, Atlas library) beside the original
+const extraPanels = EXTRA.groups.flatMap((g) => g.columns.flat().map((p) => ({ ...p, group: g.id })));
+const extraLinks = extraPanels.flatMap((p) => p.links.map((l) => ({ ...l, panel: p.title, group: p.group })));
+const everyLink = [...links.map((l) => ({ ...l, group: "osint4all" })), ...extraLinks];
+const normUrl = (u) => { const x = new URL(u); return x.hostname.replace(/^www\./, "").toLowerCase() + x.pathname.replace(/\/+$/, ""); };
 
 // The original page as of the snapshot. Update this list only when importing a newer snapshot on purpose:
 // it is here so an edit can't silently drop a panel or a link.
@@ -59,56 +62,77 @@ const ORIGINAL = [
 
 test("the board matches the original page: 4 columns, 78 panels, 1459 links, same order", () => {
   assert.deepEqual(BOARD.columns.map((col) => col.map((p) => [p.title, p.links.length])), ORIGINAL);
-  assert.equal(originalLinks.length, 1459);
+  assert.equal(links.length, 1459);
   assert.match(BOARD.snapshot, /^\d{4}-\d{2}-\d{2}$/);
   assert.match(BOARD.source, /^https:\/\/start\.me\/p\//);
 });
 
-test("the Almanac panels are the owner's additions and stay apart from the original", () => {
-  assert.ok(ALMANAC.panels.length > 0);
-  for (const p of ALMANAC.panels) {
-    assert.match(p.title, /^ALMANAC · /, `${p.title} must say it is an Almanac panel`);
-    assert.ok(p.links.length > 0, `${p.title} is empty`);
-  }
-  const hosts = ALMANAC.panels.flatMap((p) => p.links.map((l) => new URL(l.url).hostname));
-  assert.equal(new Set(hosts).size, hosts.length, "a site is listed in two Almanac panels");
-});
-
-test("every panel is in exactly one group, and Canada's panels sit together", () => {
-  const listed = GROUPS.GROUPS.flatMap((g) => g.panels);
-  assert.equal(new Set(listed).size, listed.length, "a panel is listed in two groups");
-  assert.deepEqual([...listed].sort(), panels.map((p) => p.title).sort(), "groups.js and the panels disagree");
-  const canada = GROUPS.GROUPS.find((g) => g.title === "CANADA");
-  assert.deepEqual([...canada.panels].sort(), panels.map((p) => p.title).filter((t) => t.startsWith("[CAN]")).sort());
-  assert.equal(GROUPS.GROUPS.at(-1).title, "TEACHING (ALMANAC)");
-});
-
-test("the page is called Atlas, and the A-Z button is there", () => {
-  const html = read("index.html");
-  assert.match(html, /<title>Atlas<\/title>/);
-  assert.match(html, /<h1>Atlas<\/h1>/);
-  assert.match(html, /id="az"/);
-});
-
-test("every link has a name and a real web address", () => {
-  for (const l of links) {
+test("every link, in every group, has a name and a real web address", () => {
+  for (const l of everyLink) {
     assert.ok(l.title && l.title.trim() === l.title, `${l.panel}: a link has a blank or padded name (${l.url})`);
+    assert.ok(/^https?:\/\//.test(l.url), `${l.panel}: ${l.title} is not a web address`);
     const u = new URL(l.url);
     assert.ok(u.protocol === "https:" || u.protocol === "http:", `${l.panel}: ${l.title} is not a web address`);
     assert.ok(u.hostname.includes("."), `${l.panel}: ${l.title} has no real host`);
   }
 });
 
-test("panel names are unique (the page remembers collapsed panels by name)", () => {
-  const names = panels.map((p) => p.title);
-  assert.equal(new Set(names).size, names.length);
+test("panel names are unique within each group (the same name in two groups is fine: the group heading tells them apart)", () => {
+  const names = (ps) => ps.map((p) => p.title);
+  assert.equal(new Set(names(panels)).size, panels.length);
+  for (const g of EXTRA.groups) { const ps = g.columns.flat(); assert.equal(new Set(names(ps)).size, ps.length, g.id); }
 });
 
-test("every icon a link names is in icons/, and icons/ holds nothing unused", () => {
-  const named = new Set(links.map((l) => l.icon).filter(Boolean));
-  const files = new Set(fs.readdirSync(path.join(ROOT, "icons")));
-  for (const f of named) assert.ok(files.has(f), `icons/${f} is missing`);
-  for (const f of files) assert.ok(named.has(f), `icons/${f} is not used by any link`);
+// The extra groups, pinned like the original: an edit can't silently drop a panel or a link.
+const EXTRA_EXPECTED = { socmint: [18, 152], atlas: [20, 1228] };
+test("the extra groups are SOCMINT and the Atlas library, with every panel and link in them", () => {
+  assert.deepEqual(EXTRA.groups.map((g) => g.id), ["socmint", "atlas"]);
+  for (const g of EXTRA.groups) {
+    const ps = g.columns.flat();
+    assert.deepEqual([ps.length, ps.flatMap((p) => p.links).length], EXTRA_EXPECTED[g.id], g.id);
+    assert.ok(g.title && g.note && /^https:\/\//.test(g.source), g.id + " needs a title, a note saying where it comes from, and a source");
+  }
+});
+
+test("a site is listed once across the extra groups, and never repeats one on the original board", () => {
+  const onBoard = new Set(links.map((l) => normUrl(l.url)));
+  const seen = new Set();
+  for (const l of extraLinks) {
+    const k = normUrl(l.url);
+    assert.ok(!onBoard.has(k), `${l.group}: ${l.title} is already on the original board (${l.url})`);
+    assert.ok(!seen.has(k), `${l.group}: ${l.title} is listed twice (${l.url})`);
+    seen.add(k);
+  }
+});
+
+// An icon is a bare file name in icons/ (the original board) or a path such as icons-extra/x.webp (the extra groups).
+const iconPath = (i) => (i.includes("/") ? i : "icons/" + i);
+test("every icon a link names exists, and icons/ and icons-extra/ hold nothing unused", () => {
+  const named = new Set(everyLink.map((l) => l.icon).filter(Boolean).map(iconPath));
+  for (const f of named) assert.ok(fs.existsSync(path.join(ROOT, f)), `${f} is missing`);
+  for (const dir of ["icons", "icons-extra"]) {
+    for (const f of fs.readdirSync(path.join(ROOT, dir))) assert.ok(named.has(dir + "/" + f), `${dir}/${f} is not used by any link`);
+  }
+});
+
+const STATES = new Set(["ok", "blocked", "moved", "bounced", "dead", "unreachable", "skipped"]);
+test("every link has been checked, and the details the page shows are well formed", () => {
+  for (const l of everyLink) assert.ok(STATES.has((STATUS[l.url] || {}).s), `${l.title} (${l.url}) has no link-check result: run scripts/check-links.mjs`);
+  const urls = new Set(everyLink.map((l) => l.url));
+  for (const [u, o] of Object.entries(INFO)) {
+    assert.ok(urls.has(u), `info.js describes ${u}, which is not on the board`);
+    assert.ok(!o.st || STATES.has(o.st), u + ": unknown status " + o.st);
+    assert.ok(!o.s || (o.s.length <= 300 && ["atlas", "qwen", "page", "title"].includes(o.ss)), u + ": summary too long or with no source");
+    assert.ok(!o.t || (Array.isArray(o.t) && o.t.every((x) => typeof x === "string")), u + ": tags must be a list of words");
+  }
+  for (const [u, s] of Object.entries(STATUS)) assert.ok(urls.has(u), `link-status.json has ${u}, which is not on the board`);
+});
+
+test("a link is marked possibly dead only after failing two checks in a row", () => {
+  for (const l of everyLink) {
+    const o = INFO[l.url];
+    if (o && (o.st === "dead" || o.st === "unreachable")) assert.ok((o.f || 0) >= 1, `${l.url} is dead but has no failure count`);
+  }
 });
 
 test("the page loads only its own files and sends no referrer", () => {
